@@ -1,14 +1,9 @@
 import React from 'react';
 import { Button } from 'react-bootstrap';
 
-const EditUser = ({ onEdit, user }) => {
+const EditUser = ({ handleEdit, item }) => {
   return (
-    <Button
-      variant="info"
-      size="sm"
-      onClick={() => onEdit(user)}
-      className="me-2"
-    >
+    <Button variant="info" className="me-2" onClick={() => handleEdit(item)}>
       Edit
     </Button>
   );

@@ -205,11 +205,29 @@ function App() {
 
   // 修改重置函數
   const handleReset = async () => {
-    setValue('');
-    setSortValue('');
-    setCurrentFilter('');
-    setCurrentPage(1);
-    await loadUserData('');
+    try {
+      // 先重置所有狀態
+      setValue('');
+      setSortValue('');
+      setCurrentFilter('');
+      setCurrentPage(1);
+
+      // 直接獲取並排序數據
+      const response = await axios.get('http://localhost:5000/users');
+      let formattedData = response.data.map((item) => ({
+        ...item,
+        createdAt: formatDateTime(new Date(item.createdAt)),
+        updatedAt: formatDateTime(new Date(item.updatedAt)),
+      }));
+
+      // 按 updatedAt 降序排序
+      formattedData = sortByUpdatedAt(formattedData);
+
+      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
+      setData(formattedData.slice(0, itemsPerPage));
+    } catch (err) {
+      console.error('Error resetting data:', err);
+    }
   };
 
   // 修改提交函數
@@ -297,7 +315,10 @@ function App() {
 
   // 效果
   useEffect(() => {
-    loadUserData();
+    if (!sortValue) {
+      // 只在非排序狀態下響應頁面變化
+      loadUserData();
+    }
   }, [currentPage]);
 
   return (
