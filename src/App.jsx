@@ -29,80 +29,112 @@ function App() {
     address: '',
     status: '',
   });
+  const [currentFilter, setCurrentFilter] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    loadUserData();
-  }, []);
+    if (!value.trim()) {
+      loadUserData();
+    }
+  }, [currentPage, sortValue, currentFilter]);
 
   const loadUserData = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/users');
-      setData(response.data);
+      let url = 'http://localhost:5000/users';
+      let queryParams = [];
+
+      if (sortValue) {
+        queryParams.push(`_sort=${sortValue}&_order=asc`);
+      }
+
+      if (currentFilter) {
+        queryParams.push(`status=${currentFilter}`);
+      }
+
+      if (queryParams.length > 0) {
+        url += '?' + queryParams.join('&');
+      }
+
+      const response = await axios.get(url);
+      const allData = response.data;
+
+      setTotalPages(Math.ceil(allData.length / itemsPerPage));
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setData(allData.slice(startIndex, endIndex));
     } catch (err) {
-      console.error(err);
+      console.error('Error loading data:', err);
     }
   };
 
   const handleReset = () => {
     setValue('');
     setSortValue('');
+    setCurrentFilter('');
     setCurrentPage(1);
     loadUserData();
   };
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!value) {
-      loadUserData();
-      return;
-    }
-    const searchResults = data.filter(
-      (item) =>
-        item.name.toLowerCase().includes(value.toLowerCase()) ||
-        item.email.toLowerCase().includes(value.toLowerCase()) ||
-        item.phone.includes(value) ||
-        item.address.toLowerCase().includes(value.toLowerCase()) ||
-        item.status.toLowerCase().includes(value.toLowerCase()),
-    );
-    setData(searchResults);
     setCurrentPage(1);
+
+    try {
+      if (value.trim() === '') {
+        await loadUserData();
+        return;
+      }
+
+      const response = await axios.get('http://localhost:5000/users');
+      const allData = response.data;
+
+      const filteredData = allData.filter((item) => {
+        const searchTerm = value.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(searchTerm) ||
+          item.email?.toLowerCase().includes(searchTerm) ||
+          item.phone?.toLowerCase().includes(searchTerm) ||
+          item.address?.toLowerCase().includes(searchTerm) ||
+          item.status?.toLowerCase().includes(searchTerm)
+        );
+      });
+
+      setTotalPages(Math.ceil(filteredData.length / itemsPerPage));
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setData(filteredData.slice(startIndex, endIndex));
+    } catch (err) {
+      console.error('Error searching data:', err);
+    }
   };
 
   const handleSort = async (e) => {
-    let value = e.target.value;
-    setSortValue(value);
-    try {
-      const response = await axios.get(
-        `http://localhost:5000/users?_sort=${value}&_order=asc`,
-      );
-      setData(response.data);
-    } catch (err) {
-      console.error(err);
-    }
+    setSortValue(e.target.value);
+    setCurrentPage(1);
+    await loadUserData();
   };
 
-  const handleFilter = async (value) => {
-    try {
-      const response = await axios.get(
-        `http://localhost:5000/users?status=${value}`,
-      );
-      setData(response.data);
-      setCurrentPage(1);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleFilter = async (status) => {
+    setCurrentFilter(status);
+    setCurrentPage(1);
+    await loadUserData();
   };
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
+    if (value.trim()) {
+      handleSearch(new Event('submit'));
+    } else {
+      loadUserData();
+    }
   };
 
   const currentPageData = data.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
-
-  const totalPages = Math.ceil(data.length / itemsPerPage);
 
   const toggleModal = () => {
     setShowModal(!showModal);
@@ -115,24 +147,37 @@ function App() {
       if (isEditing) {
         await axios.put(`http://localhost:5000/users/${formData.id}`, formData);
       } else {
-        const response = await axios.post('http://localhost:5000/users', {
+        const newUser = {
           ...formData,
           id: Date.now().toString(),
-        });
+          createdAt: new Date().toISOString(),
+        };
 
-        if (response.status === 201) {
-          console.log('User added successfully:', response.data);
+        const response = await axios.post(
+          'http://localhost:5000/users',
+          newUser,
+        );
+
+        if (response.status !== 201) {
+          throw new Error('Failed to add new user');
         }
+
+        console.log('New user added:', response.data);
       }
 
       setShowModal(false);
-
       resetFormData();
-
+      setCurrentPage(1);
       await loadUserData();
+
+      alert(
+        isEditing ? 'User updated successfully!' : 'User added successfully!',
+      );
     } catch (err) {
       console.error('Error:', err);
-      alert('An error occurred. Please try again.');
+      alert(
+        `Error: ${err.message || 'Failed to save data. Please try again.'}`,
+      );
     }
   };
 
@@ -144,11 +189,58 @@ function App() {
       address: '',
       status: '',
     });
+    setIsEditing(false);
   };
+
+  const handleEdit = (item) => {
+    setFormData({
+      id: item.id,
+      name: item.name,
+      email: item.email,
+      phone: item.phone,
+      address: item.address,
+      status: item.status,
+    });
+    setIsEditing(true);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this record?')) {
+      try {
+        await axios.delete(`http://localhost:5000/users/${id}`);
+
+        if (data.length === 1 && currentPage > 1) {
+          setCurrentPage((prev) => prev - 1);
+        } else {
+          await loadUserData();
+        }
+      } catch (err) {
+        console.error('Error deleting record:', err);
+        alert('Error deleting record. Please try again.');
+      }
+    }
+  };
+
+  const checkServerConnection = async () => {
+    try {
+      await axios.get('http://localhost:5000/users');
+      console.log('Successfully connected to JSON Server');
+    } catch (err) {
+      console.error('Error connecting to JSON Server:', err);
+      alert(
+        'Cannot connect to the server. Please ensure JSON Server is running.',
+      );
+    }
+  };
+
+  useEffect(() => {
+    checkServerConnection();
+  }, []);
 
   return (
     <Container>
-      <form
+      <Form
         style={{
           margin: 'auto',
           padding: '15px',
@@ -158,20 +250,19 @@ function App() {
         className="d-flex input-group w-auto"
         onSubmit={handleSearch}
       >
-        <input
+        <Form.Control
           type="text"
-          className="form-control"
-          placeholder="Search Name ..."
+          placeholder="Search..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
         <Button type="submit" variant="dark">
           Search
         </Button>
-        <Button className="mx-2" variant="info" onClick={handleReset}>
+        <Button variant="info" onClick={handleReset} className="mx-2">
           Reset
         </Button>
-      </form>
+      </Form>
 
       <Row>
         <Col md={8}>
@@ -312,24 +403,42 @@ function App() {
                   <th>Phone</th>
                   <th>Address</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {currentPageData.length === 0 ? (
+                {data.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center">
+                    <td colSpan={7} className="text-center">
                       No Data Found
                     </td>
                   </tr>
                 ) : (
-                  currentPageData.map((item, index) => (
+                  data.map((item, index) => (
                     <tr key={index}>
-                      <th>{(currentPage - 1) * itemsPerPage + index + 1}</th>
+                      <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                       <td>{item.name}</td>
                       <td>{item.email}</td>
                       <td>{item.phone}</td>
                       <td>{item.address}</td>
                       <td>{item.status}</td>
+                      <td>
+                        <Button
+                          variant="info"
+                          size="sm"
+                          onClick={() => handleEdit(item)}
+                          className="me-2"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          Delete
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}
