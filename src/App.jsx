@@ -51,14 +51,174 @@ function App() {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
-  // 添加 handleSubmit 函數
+  // 添加排序函數
+  const sortByUpdatedAt = (data) => {
+    return [...data].sort((a, b) => {
+      const dateA = new Date(a.updatedAt);
+      const dateB = new Date(b.updatedAt);
+      return dateB - dateA; // 降序排序
+    });
+  };
+
+  // 添加通用排序函數
+  const sortByField = (data, field) => {
+    return [...data].sort((a, b) => {
+      if (
+        field === 'name' ||
+        field === 'email' ||
+        field === 'phone' ||
+        field === 'address' ||
+        field === 'status'
+      ) {
+        // 字符串排序
+        return (a[field] || '').localeCompare(b[field] || '');
+      } else {
+        // 默認排序
+        return a[field] > b[field] ? 1 : -1;
+      }
+    });
+  };
+
+  // 修改數據加載函數
+  const loadUserData = async (filterStatus = currentFilter) => {
+    try {
+      let url = 'http://localhost:5000/users';
+      let queryParams = [];
+
+      // 添加過濾參數
+      if (filterStatus) {
+        queryParams.push(`status=${encodeURIComponent(filterStatus)}`);
+      }
+
+      // 組合 URL
+      if (queryParams.length > 0) {
+        url += '?' + queryParams.join('&');
+      }
+
+      const response = await axios.get(url);
+      let formattedData = response.data.map((item) => ({
+        ...item,
+        createdAt: item.createdAt
+          ? formatDateTime(new Date(item.createdAt))
+          : '',
+        updatedAt: item.updatedAt
+          ? formatDateTime(new Date(item.updatedAt))
+          : '',
+      }));
+
+      // 根據排序選項進行排序
+      if (sortValue) {
+        formattedData = sortByField(formattedData, sortValue);
+      } else {
+        formattedData = sortByUpdatedAt(formattedData);
+      }
+
+      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setData(formattedData.slice(startIndex, endIndex));
+    } catch (err) {
+      console.error('Error loading data:', err);
+    }
+  };
+
+  // 修改搜索處理函數
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    setSortValue('');
+
+    try {
+      if (value.trim() === '') {
+        await loadUserData();
+        return;
+      }
+
+      const response = await axios.get('http://localhost:5000/users');
+      let allData = response.data;
+
+      // 先過濾數據
+      const filteredData = allData.filter((item) => {
+        const searchTerm = value.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(searchTerm) ||
+          item.email?.toLowerCase().includes(searchTerm) ||
+          item.phone?.toLowerCase().includes(searchTerm) ||
+          item.address?.toLowerCase().includes(searchTerm) ||
+          item.status?.toLowerCase().includes(searchTerm)
+        );
+      });
+
+      // 格式化並排序數據
+      let formattedData = filteredData.map((item) => ({
+        ...item,
+        createdAt: formatDateTime(new Date(item.createdAt)),
+        updatedAt: formatDateTime(new Date(item.updatedAt)),
+      }));
+
+      // 按 updatedAt 降序排序
+      formattedData = sortByUpdatedAt(formattedData);
+
+      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
+      setData(formattedData.slice(0, itemsPerPage));
+    } catch (err) {
+      console.error('Error searching data:', err);
+    }
+  };
+
+  // 修改過濾處理函數
+  const handleFilter = async (status) => {
+    setCurrentFilter(status === currentFilter ? '' : status);
+    setCurrentPage(1);
+    await loadUserData(status === currentFilter ? '' : status);
+  };
+
+  // 修改排序處理函數
+  const handleSort = async (e) => {
+    const value = e.target.value;
+    setSortValue(value);
+    setCurrentPage(1);
+
+    try {
+      const response = await axios.get('http://localhost:5000/users');
+      let formattedData = response.data.map((item) => ({
+        ...item,
+        createdAt: formatDateTime(new Date(item.createdAt)),
+        updatedAt: formatDateTime(new Date(item.updatedAt)),
+      }));
+
+      if (value) {
+        // 按選擇的字段排序
+        formattedData = sortByField(formattedData, value);
+      } else {
+        // 默認按 updatedAt 降序排序
+        formattedData = sortByUpdatedAt(formattedData);
+      }
+
+      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
+      setData(formattedData.slice(0, itemsPerPage));
+    } catch (err) {
+      console.error('Error sorting data:', err);
+    }
+  };
+
+  // 修改重置函數
+  const handleReset = async () => {
+    setValue('');
+    setSortValue('');
+    setCurrentFilter('');
+    setCurrentPage(1);
+    await loadUserData('');
+  };
+
+  // 修改提交函數
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const currentTime = formatDateTime(new Date());
 
       if (isEditing) {
-        // 更新用戶時只更新 updatedAt
         const updatedUser = {
           ...formData,
           updatedAt: currentTime,
@@ -68,7 +228,6 @@ function App() {
           updatedUser,
         );
       } else {
-        // 新增用戶時設置 id, createdAt 和 updatedAt
         const newUser = {
           ...formData,
           id: generateObjectId(),
@@ -76,7 +235,6 @@ function App() {
           updatedAt: currentTime,
         };
 
-        // 驗證 ID 格式
         if (!/^[0-9a-f]{24}$/.test(newUser.id)) {
           throw new Error('Invalid ID format generated');
         }
@@ -86,8 +244,9 @@ function App() {
 
       setShowModal(false);
       resetFormData();
+      setSortValue(''); // 重置排序選項
       setCurrentPage(1);
-      await loadUserData();
+      await loadUserData(currentFilter);
 
       alert(
         isEditing ? 'User updated successfully!' : 'User added successfully!',
@@ -100,24 +259,24 @@ function App() {
     }
   };
 
-  // 添加 handleEdit 函數
-  const handleEdit = (item) => {
-    setFormData(item);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  // 添加 handleDelete 函數
+  // 修改刪除函數
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
       try {
         await axios.delete(`http://localhost:5000/users/${id}`);
-        await loadUserData();
+        await loadUserData(currentFilter);
       } catch (err) {
         console.error('Error deleting record:', err);
         alert('Error deleting record. Please try again.');
       }
     }
+  };
+
+  // 添加 handleEdit 函數
+  const handleEdit = (item) => {
+    setFormData(item);
+    setIsEditing(true);
+    setShowModal(true);
   };
 
   // 添加 resetFormData 函數
@@ -130,194 +289,6 @@ function App() {
       status: '',
     });
     setIsEditing(false);
-  };
-
-  // 修改數據加載函數
-  const loadUserData = async () => {
-    try {
-      let url = 'http://localhost:5000/users';
-      let queryParams = [];
-
-      // 處理排序邏輯
-      if (sortValue) {
-        queryParams.push(`_sort=${sortValue}&_order=asc`);
-      } else {
-        queryParams.push('_sort=updatedAt&_order=desc');
-      }
-
-      // 處理過濾邏輯
-      if (currentFilter) {
-        queryParams.push(`status=${encodeURIComponent(currentFilter)}`);
-      }
-
-      // 組合 URL
-      if (queryParams.length > 0) {
-        url += '?' + queryParams.join('&');
-      }
-
-      const response = await axios.get(url);
-      const allData = response.data;
-
-      // 格式化時間
-      const formattedData = allData.map((item) => ({
-        ...item,
-        createdAt: item.createdAt
-          ? formatDateTime(new Date(item.createdAt))
-          : '',
-        updatedAt: item.updatedAt
-          ? formatDateTime(new Date(item.updatedAt))
-          : '',
-      }));
-
-      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
-
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      setData(formattedData.slice(startIndex, endIndex));
-    } catch (err) {
-      console.error('Error loading data:', err);
-    }
-  };
-
-  // 修改排序處理函數
-  const handleSort = async (e) => {
-    const value = e.target.value;
-    setSortValue(value);
-    setCurrentPage(1);
-
-    try {
-      let url = 'http://localhost:5000/users';
-
-      if (value) {
-        // 如果選擇了排序字段
-        url += `?_sort=${value}&_order=asc`;
-      } else {
-        // 如果選擇 "Please Select Value"，則恢復默認排序
-        url += '?_sort=updatedAt&_order=desc';
-      }
-
-      const response = await axios.get(url);
-      const formattedData = response.data.map((item) => ({
-        ...item,
-        createdAt: item.createdAt
-          ? formatDateTime(new Date(item.createdAt))
-          : '',
-        updatedAt: item.updatedAt
-          ? formatDateTime(new Date(item.updatedAt))
-          : '',
-      }));
-
-      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
-      setData(formattedData.slice(0, itemsPerPage));
-    } catch (err) {
-      console.error('Error sorting data:', err);
-    }
-  };
-
-  // 修改搜索處理函數
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    setCurrentPage(1);
-
-    try {
-      if (value.trim() === '') {
-        await loadUserData();
-        return;
-      }
-
-      let url = 'http://localhost:5000/users';
-      let queryParams = [];
-
-      // 添加排序
-      if (sortValue) {
-        queryParams.push(`_sort=${sortValue}&_order=asc`);
-      } else {
-        queryParams.push('_sort=updatedAt&_order=desc');
-      }
-
-      // 添加過濾
-      if (currentFilter) {
-        queryParams.push(`status=${encodeURIComponent(currentFilter)}`);
-      }
-
-      if (queryParams.length > 0) {
-        url += '?' + queryParams.join('&');
-      }
-
-      const response = await axios.get(url);
-      const allData = response.data;
-
-      // 搜索過濾
-      const filteredData = allData.filter((item) => {
-        const searchTerm = value.toLowerCase();
-        return (
-          item.name?.toLowerCase().includes(searchTerm) ||
-          item.email?.toLowerCase().includes(searchTerm) ||
-          item.phone?.toLowerCase().includes(searchTerm) ||
-          item.address?.toLowerCase().includes(searchTerm) ||
-          item.status?.toLowerCase().includes(searchTerm)
-        );
-      });
-
-      const formattedData = filteredData.map((item) => ({
-        ...item,
-        createdAt: formatDateTime(new Date(item.createdAt)),
-        updatedAt: formatDateTime(new Date(item.updatedAt)),
-      }));
-
-      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
-      setData(formattedData.slice(0, itemsPerPage));
-    } catch (err) {
-      console.error('Error searching data:', err);
-    }
-  };
-
-  // 修改�濾處理函數
-  const handleFilter = async (status) => {
-    try {
-      setCurrentFilter(status === currentFilter ? '' : status);
-      setCurrentPage(1);
-
-      let url = 'http://localhost:5000/users';
-      let queryParams = [];
-
-      // 處理排序
-      if (sortValue) {
-        queryParams.push(`_sort=${sortValue}&_order=asc`);
-      } else {
-        queryParams.push('_sort=updatedAt&_order=desc');
-      }
-
-      // 處理過濾
-      if (status && status !== currentFilter) {
-        queryParams.push(`status=${encodeURIComponent(status)}`);
-      }
-
-      if (queryParams.length > 0) {
-        url += '?' + queryParams.join('&');
-      }
-
-      const response = await axios.get(url);
-      const formattedData = response.data.map((item) => ({
-        ...item,
-        createdAt: formatDateTime(new Date(item.createdAt)),
-        updatedAt: formatDateTime(new Date(item.updatedAt)),
-      }));
-
-      setTotalPages(Math.ceil(formattedData.length / itemsPerPage));
-      setData(formattedData.slice(0, itemsPerPage));
-    } catch (err) {
-      console.error('Error filtering data:', err);
-    }
-  };
-
-  // 修改重置函數
-  const handleReset = async () => {
-    setValue('');
-    setSortValue('');
-    setCurrentFilter('');
-    setCurrentPage(1);
-    await loadUserData();
   };
 
   const handlePageChange = (pageNumber) => {

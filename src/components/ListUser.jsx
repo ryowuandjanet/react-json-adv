@@ -20,17 +20,13 @@ const ListUser = ({
           <th>Phone</th>
           <th>Address</th>
           <th>Status</th>
-          <th>Actions</th>
+          <th>Created At</th>
+          <th>Updated At</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
-        {data.length === 0 ? (
-          <tr>
-            <td colSpan={7} className="text-center">
-              No Data Found
-            </td>
-          </tr>
-        ) : (
+        {data && data.length > 0 ? (
           data.map((item, index) => (
             <tr key={item.id}>
               <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
@@ -39,12 +35,20 @@ const ListUser = ({
               <td>{item.phone}</td>
               <td>{item.address}</td>
               <td>{item.status}</td>
+              <td>{item.createdAt || '-'}</td>
+              <td>{item.updatedAt || '-'}</td>
               <td>
-                <EditUser onEdit={handleEdit} user={item} />
-                <DeleteUser onDelete={handleDelete} userId={item.id} />
+                <EditUser handleEdit={handleEdit} item={item} />
+                <DeleteUser handleDelete={handleDelete} userId={item.id} />
               </td>
             </tr>
           ))
+        ) : (
+          <tr>
+            <td colSpan="9" className="text-center">
+              No Data Found
+            </td>
+          </tr>
         )}
       </tbody>
     </Table>
