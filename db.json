@@ -61,16 +61,6 @@
       "updatedAt": "2015-06-25 01:43:17"
     },
     {
-      "id": "67549009357a966e985d080a",
-      "name": "Atkins Long",
-      "email": "atkinslong@pheast.com",
-      "phone": "(962) 424-2366",
-      "address": "Girard Street, Jeff, Virginia, 5501",
-      "status": "Inactive",
-      "createdAt": "2019-09-11 17:05:22",
-      "updatedAt": "2024-12-08 03:04:22"
-    },
-    {
       "id": "67549009aa905961daa5663e",
       "name": "Day Espinoza",
       "email": "dayespinoza@pheast.com",
@@ -379,16 +369,6 @@
       "status": "Active",
       "createdAt": "2024-12-08 03:02:52",
       "updatedAt": "2024-12-08 03:02:52"
-    },
-    {
-      "id": "6754ed3afe16ffb970aac96c",
-      "name": "test2",
-      "email": "test@gmail.com",
-      "phone": "09037472833",
-      "address": "here",
-      "status": "Active",
-      "createdAt": "2024-12-08 08:50:02",
-      "updatedAt": "2024-12-08 08:50:02"
     }
   ]
 }

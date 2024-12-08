@@ -9,6 +9,7 @@ import SearchUser from './components/SearchUser';
 import SortUser from './components/SortUser';
 import FilterUser from './components/FilterUser';
 import ListUser from './components/ListUser';
+import DeleteUser from './components/DeleteUser';
 
 function App() {
   const port = import.meta.env.VITE_PORT;
@@ -277,14 +278,17 @@ function App() {
 
   // 修改刪除函數
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this record?')) {
-      try {
-        await axios.delete(`${port}/users/${id}`);
+    try {
+      const response = await axios.delete(`${port}/users/${id}`);
+      if (response.status === 200) {
         await loadUserData(currentFilter);
-      } catch (err) {
-        console.error('Error deleting record:', err);
-        alert('Error deleting record. Please try again.');
+        alert('Record deleted successfully!');
+      } else {
+        throw new Error('Failed to delete record');
       }
+    } catch (err) {
+      console.error('Error deleting record:', err);
+      alert(`Error deleting record: ${err.message || 'Please try again.'}`);
     }
   };
 

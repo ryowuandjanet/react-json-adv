@@ -1,15 +1,15 @@
 import React from 'react';
 import { Button } from 'react-bootstrap';
 
-const DeleteUser = ({ onDelete, userId }) => {
-  const handleDelete = () => {
+const DeleteUser = ({ handleDelete, userId }) => {
+  const onDeleteClick = () => {
     if (window.confirm('Are you sure you want to delete this record?')) {
-      onDelete(userId);
+      handleDelete(userId);
     }
   };
 
   return (
-    <Button variant="danger" size="sm" onClick={handleDelete}>
+    <Button variant="danger" size="sm" onClick={onDeleteClick}>
       Delete
     </Button>
   );
