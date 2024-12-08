@@ -11,6 +11,7 @@ import FilterUser from './components/FilterUser';
 import ListUser from './components/ListUser';
 
 function App() {
+  const port = import.meta.env.VITE_PORT;
   const [data, setData] = useState([]);
   const [value, setValue] = useState('');
   const [sortValue, setSortValue] = useState('');
@@ -82,7 +83,7 @@ function App() {
   // 修改數據加載函數
   const loadUserData = async (filterStatus = currentFilter) => {
     try {
-      let url = 'http://localhost:5000/users';
+      let url = `${port}/users`;
       let queryParams = [];
 
       // 添加過濾參數
@@ -135,7 +136,7 @@ function App() {
         return;
       }
 
-      const response = await axios.get('http://localhost:5000/users');
+      const response = await axios.get(`${port}/users`);
       let allData = response.data;
 
       // 先過濾數據
@@ -181,7 +182,7 @@ function App() {
     setCurrentPage(1);
 
     try {
-      const response = await axios.get('http://localhost:5000/users');
+      const response = await axios.get(`${port}/users`);
       let formattedData = response.data.map((item) => ({
         ...item,
         createdAt: formatDateTime(new Date(item.createdAt)),
@@ -213,7 +214,7 @@ function App() {
       setCurrentPage(1);
 
       // 直接獲取並排序數據
-      const response = await axios.get('http://localhost:5000/users');
+      const response = await axios.get(`${port}/users`);
       let formattedData = response.data.map((item) => ({
         ...item,
         createdAt: formatDateTime(new Date(item.createdAt)),
@@ -241,10 +242,7 @@ function App() {
           ...formData,
           updatedAt: currentTime,
         };
-        await axios.put(
-          `http://localhost:5000/users/${formData.id}`,
-          updatedUser,
-        );
+        await axios.put(`${port}/users/${formData.id}`, updatedUser);
       } else {
         const newUser = {
           ...formData,
@@ -257,7 +255,7 @@ function App() {
           throw new Error('Invalid ID format generated');
         }
 
-        await axios.post('http://localhost:5000/users', newUser);
+        await axios.post(`${port}/users`, newUser);
       }
 
       setShowModal(false);
@@ -281,7 +279,7 @@ function App() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
       try {
-        await axios.delete(`http://localhost:5000/users/${id}`);
+        await axios.delete(`${port}/users/${id}`);
         await loadUserData(currentFilter);
       } catch (err) {
         console.error('Error deleting record:', err);
